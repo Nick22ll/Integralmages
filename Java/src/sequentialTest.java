@@ -1,4 +1,3 @@
-import java.util.Vector;
 
 public class sequentialTest {
     int executions;

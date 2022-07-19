@@ -1,5 +1,3 @@
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Vector;
 
 public class Main {
@@ -7,9 +5,9 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
 
         String[] image_names = {"480", "720", "1080", "1440", "2160"};
-        
+
         for (String name : image_names) {
-            GreyImage image = new GreyImage("U:/Magistrale/Parallel Computing/IntegralImagesCUDA/images/" + name + ".jpg");
+            GreyImage image = new GreyImage("images/" + name + ".jpg");
 
             System.out.println("STARTING SEQUENTIAL TEST WITH IMAGE: " + name + ".jpg! \n");
             sequentialTest seqTest = new sequentialTest(image, 100);
