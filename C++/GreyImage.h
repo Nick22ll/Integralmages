@@ -1,6 +1,3 @@
-//
-// Created by Nicco on 11/07/2022.
-//
 
 #ifndef INTEGRALIMAGESCUDA_GREYIMAGE_H
 #define INTEGRALIMAGESCUDA_GREYIMAGE_H

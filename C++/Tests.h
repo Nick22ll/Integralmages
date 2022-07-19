@@ -93,7 +93,8 @@ vector<double> testCUDAwithMemory(GreyImage& image, const vector<int>& num_threa
             if(exec_time > max_exec_time)
                 max_exec_time = exec_time;
 
-            delete[] integral_image;
+            checkCuda(cudaFreeHost(integral_image));
+            //delete[] integral_image;
         }
 
         mean_exec_time /= executions;

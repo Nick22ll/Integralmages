@@ -7,10 +7,10 @@ using namespace std;
 
 int main() {
 
-    vector<string> image_names = {"480", "720", "1080", "1440", "2160"};
+    vector<string> image_names = { "480", "720", "1080", "1440", "2160"};
 
     for(const auto& name: image_names){
-        GreyImage image = GreyImage(R"(U:\Magistrale\Parallel Computing\IntegralImagesCUDA\images\)" + name + ".jpg");
+        GreyImage image = GreyImage("../images/" + name + ".jpg");
 
         cout << "STARTING SEQUENTIAL TEST WITH IMAGE: " <<name<< ".jpg! \n" << endl;
         double mean_sequential = testSequential(image);

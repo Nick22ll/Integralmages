@@ -1,6 +1,3 @@
-//
-// Created by Nicco on 14/07/2022.
-//
 
 #ifndef INTEGRALIMAGESCUDA_CUDAINTEGRALIMAGE_CU
 #define INTEGRALIMAGESCUDA_CUDAINTEGRALIMAGE_CU
@@ -8,8 +5,26 @@
 #include "GreyImage.h"
 #define BLOCK_DIM 16
 
+// Macro to aligned up to the memory size in question
+#define MEMORY_ALIGNMENT  4096
+#define ALIGN_UP(x,size) ( ((size_t)x+(size-1))&(~(size-1)) )
+
+
 using namespace std;
 
+//Check CUDA Errors
+
+cudaError_t checkCuda(cudaError_t result)
+{
+    if (result != cudaSuccess) {
+        fprintf(stderr, "CUDA Runtime Error: %s\n", cudaGetErrorString(result));
+        assert(result == cudaSuccess);
+    }
+    return result;
+}
+
+
+//Kernels
 __global__ void CUDASumRowIntegralImage(int width, int height, int* integralImage){
 
     //each thread is responsible for a specific row
@@ -65,16 +80,25 @@ int* parallelIntegralImage(GreyImage image, const int thread_per_block){
     int block_num_for_columns = (width + thread_per_block)/thread_per_block;
     int block_num_for_rows = (height+thread_per_block)/thread_per_block;
 
-    cudaHostRegister(&original_image, size, cudaHostRegisterDefault);
-    cudaHostRegister(&parallel_integral_image, size, cudaHostRegisterDefault);
+    //checkCuda(cudaHostRegister(&original_image, sizeof(int) * size, cudaHostRegisterDefault));
+    //checkCuda(cudaHostRegister(&parallel_integral_image, sizeof(int) * size, cudaHostRegisterDefault));
+
+    checkCuda(cudaMallocHost((void**)&original_image, sizeof(int) * size));
+    checkCuda(cudaMallocHost((void**)&parallel_integral_image, sizeof(int) * size));
+
+    int* tmp = image.getImage();
+    for(int i=0;i<height;i++)
+        for(int j=0; j<width; j++)
+            original_image[i*width+j] = tmp[i*width+j];
+    delete[] tmp;
 
     //Allocate device memory
-    cudaMalloc((void**)&d_original_image, sizeof(int) * size);
-    cudaMalloc((void**)&d_integral_image, sizeof(int) * size);
-    cudaMalloc((void**)&d_transpose, sizeof(int) * size);
+    checkCuda(cudaMalloc((void**)&d_original_image, sizeof(int) * size));
+    checkCuda(cudaMalloc((void**)&d_integral_image, sizeof(int) * size));
+    checkCuda(cudaMalloc((void**)&d_transpose, sizeof(int) * size));
 
     // Transfer data from host to device memory
-    cudaMemcpy(d_original_image, original_image, sizeof(int) * size, cudaMemcpyHostToDevice);
+    checkCuda(cudaMemcpy(d_original_image, original_image, sizeof(int) * size, cudaMemcpyHostToDevice));
 
     // Executing kernel
 
@@ -88,14 +112,16 @@ int* parallelIntegralImage(GreyImage image, const int thread_per_block){
     CUDASumRowIntegralImage<<<block_num_for_rows, thread_per_block>>>(width, height, d_integral_image);
 
     // Transfer data back to host memory
-    cudaMemcpy(parallel_integral_image, d_integral_image, sizeof(int) * size, cudaMemcpyDeviceToHost);
+    checkCuda(cudaMemcpy(parallel_integral_image, d_integral_image, sizeof(int) * size, cudaMemcpyDeviceToHost));
 
     // Deallocate device memory
-    cudaFree(d_original_image);
-    cudaFree(d_integral_image);
-    cudaFree(d_transpose);
+    checkCuda(cudaFree(d_original_image));
+    checkCuda(cudaFree(d_integral_image));
+    checkCuda(cudaFree(d_transpose));
 
-    delete[] original_image;
+    checkCuda(cudaFreeHost(original_image));
+    //delete[] original_image;
+
     return parallel_integral_image;
 }
 
@@ -104,9 +130,11 @@ double timeParallelIntegralImage(GreyImage image, const int thread_per_block){
     int width = image.getWidth();
 
     //Allocate host memory
-    int* original_image = image.getImage();
+    //int* original_image = image.getImage();
+    int* original_image;
     int size = height*width;
-    int* parallel_integral_image = new int[size];
+    //int* parallel_integral_image = new int[size];
+    int* parallel_integral_image;
 
     int* d_original_image;
     int* d_integral_image;
@@ -115,20 +143,29 @@ double timeParallelIntegralImage(GreyImage image, const int thread_per_block){
     int block_num_for_columns = (width + thread_per_block)/thread_per_block;
     int block_num_for_rows = (height+thread_per_block)/thread_per_block;
 
-    cudaHostRegister(&original_image, size, cudaHostRegisterDefault);
-    cudaHostRegister(&parallel_integral_image, size, cudaHostRegisterDefault);
+    //checkCuda(cudaHostRegister(&original_image, sizeof(int) * size, cudaHostRegisterDefault));
+    //checkCuda(cudaHostRegister(&parallel_integral_image, sizeof(int) * size, cudaHostRegisterDefault));
+
+    checkCuda(cudaMallocHost((void**)&original_image, sizeof(int) * size));
+    checkCuda(cudaMallocHost((void**)&parallel_integral_image, sizeof(int) * size));
+
+    int* tmp = image.getImage();
+    for(int i=0;i<height;i++)
+        for(int j=0; j<width; j++)
+            original_image[i*width+j] = tmp[i*width+j];
+    delete[] tmp;
 
     dim3 grid((width + BLOCK_DIM)/ BLOCK_DIM, (height+BLOCK_DIM)/ BLOCK_DIM, 1);
     dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
     dim3 grid_after_trasp((height+BLOCK_DIM)/ BLOCK_DIM, (width + BLOCK_DIM)/BLOCK_DIM, 1);
 
     //Allocate device memory
-    cudaMalloc((void**)&d_original_image, sizeof(int) * width * height);
-    cudaMalloc((void**)&d_integral_image, sizeof(int) * width * height);
-    cudaMalloc((void**)&d_transpose, sizeof(int) * width * height);
+    checkCuda(cudaMalloc((void**)&d_original_image, sizeof(int) * size));
+    checkCuda(cudaMalloc((void**)&d_integral_image, sizeof(int) * size));
+    checkCuda(cudaMalloc((void**)&d_transpose, sizeof(int) * size));
 
     // Transfer data from host to device memory
-    cudaMemcpy(d_original_image, original_image, sizeof(int) * width * height, cudaMemcpyHostToDevice);
+    checkCuda(cudaMemcpy(d_original_image, original_image, sizeof(int) * size, cudaMemcpyHostToDevice));
 
     //warm-up
     transpose<<<grid,threads>>>(d_transpose, d_original_image, width, height);
@@ -150,15 +187,17 @@ double timeParallelIntegralImage(GreyImage image, const int thread_per_block){
     diff = std::chrono::system_clock::now() - start;
 
     // Transfer data back to host memory
-    cudaMemcpy(parallel_integral_image, d_integral_image, sizeof(int) * width * height, cudaMemcpyDeviceToHost);
+    checkCuda(cudaMemcpy(parallel_integral_image, d_integral_image, sizeof(int) * size, cudaMemcpyDeviceToHost));
 
     // Deallocate device memory
-    cudaFree(d_original_image);
-    cudaFree(d_integral_image);
-    cudaFree(d_transpose);
+    checkCuda(cudaFree(d_original_image));
+    checkCuda(cudaFree(d_integral_image));
+    checkCuda(cudaFree(d_transpose));
 
-    delete[] parallel_integral_image;
-    delete[] original_image;
+    cudaFreeHost(original_image);
+    cudaFreeHost(parallel_integral_image);
+    //delete[] parallel_integral_image;
+    //delete[] original_image;
 
     return diff.count();
 }
